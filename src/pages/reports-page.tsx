@@ -17,7 +17,7 @@ export function ReportsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{labels.reports}</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{labels.reports}</h1>
         <Button asChild>
           <Link to="/reports/new">
             <Plus className="h-4 w-4" />
@@ -37,33 +37,32 @@ export function ReportsPage() {
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {reports.map((report) => (
-            <Link key={report.id} to={`/reports/${report.year}/${report.month}`}>
-              <Card className="transition-shadow hover:shadow-md">
-                <CardHeader>
-                  <CardTitle className="text-lg">
-                    {formatMonthLabel(report.year, report.month)}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">{labels.totalIncome}</span>
-                    <span>{formatShekels(report.totalIncome)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">{labels.maaserRemaining}</span>
-                    <span className={report.remainingBalance > 0 ? 'text-red-600' : 'text-green-600'}>
-                      {formatShekels(Math.max(report.remainingBalance, 0))}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">{labels.maaserDebt}</span>
-                    <span>{formatShekels(report.closingDebt)}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+          {reports.map((report) => {
+            const due = Math.max(report.remainingBalance, 0)
+            return (
+              <Link key={report.id} to={`/reports/${report.year}/${report.month}`}>
+                <Card className="transition-shadow hover:shadow-md">
+                  <CardHeader>
+                    <CardTitle className="text-lg">
+                      {formatMonthLabel(report.year, report.month)}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-[var(--color-muted-foreground)]">
+                      {labels.netBalance}
+                    </p>
+                    <p
+                      className={`mt-1 text-2xl font-bold tabular-nums ${
+                        due > 0 ? 'text-red-600' : 'text-emerald-600'
+                      }`}
+                    >
+                      {formatShekels(due)}
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+            )
+          })}
         </div>
       )}
     </div>

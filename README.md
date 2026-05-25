@@ -19,12 +19,6 @@ cp .env.example .env
 npm run dev
 ```
 
-### מצב הדגמה (ללא Firebase)
-
-במסך ההתחברות לחצו **כניסה למצב הדגמה**. הנתונים נשמרים ב-`localStorage` עם seed מובנה (משפחת כהן, דוחות 04–05/2025, תרומות קבועות).
-
-קוד הזמנה להדגמה: `DEMO1234`
-
 ## משתני סביבה
 
 | משתנה | תיאור |
@@ -55,9 +49,9 @@ firebase deploy --only firestore:indexes
 |------|----------------|
 | `households` | id, name, createdAt, createdBy |
 | `householdMembers` | householdId, userId, role (owner \| member), email, displayName |
-| `householdSettings` | householdId, creditCarryForwardEnabled |
+| `householdSettings` | householdId |
 | `householdInvites` | householdId, code, expiresAt |
-| `monthlyReports` | householdId, year, month, income, donations, computed totals (agorot) |
+| `monthlyReports` | householdId, year, month, memberIncomes, donations, applyCreditFromPrevious, computed totals (agorot) |
 | `fixedDonations` | householdId, name, amount, start/end month |
 | `auditLogs` | householdId, userId, actionType, entityType, before/after state |
 | `userProfiles` | uid, activeHouseholdId |
@@ -69,13 +63,11 @@ firebase deploy --only firestore:indexes
 ```
 סה"כ הכנסות = משכורת בעל + משכורת אישה + הכנסות נוספות
 חובת מעשר = 10% מסה"כ הכנסות (עיגול למספר שלם)
-חובת מעשר מותאמת = חובת מעשר + חוב מעשר פתיחה - זיכוי מעשר פתיחה (רק אם העברה מופעלת)
-יתרה = חובת מעשר מותאמת - תרומות קבועות - תרומות חד-פעמיות
-חוב מעשר סגירה = max(יתרה, 0)
-זיכוי מעשר = abs(יתרה) כאשר יתרה שלילית
+חובת מעשר מותאמת = חובת מעשר + חוב מעשר מחודשים קודמים - זיכוי מחודש קודם (רק אם המשתמש בוחר להחיל)
+יתרה לתשלום = חובת מעשר מותאמת - תרומות קבועות - תרומות חד-פעמיות
 ```
 
-חוב מעשר תמיד מועבר לחודש הבא. זיכוי מעשר מועבר רק כאשר `creditCarryForwardEnabled` פעיל בהגדרות.
+חוב מעשר תמיד מועבר אוטומטית. זיכוי מעשר נשמר לפי חודש ומוחל רק בבחירה מפורשת בדוח החודשי.
 
 ## פריסה ל-Cloudflare Pages
 
@@ -116,20 +108,6 @@ src/
 | `npm run build` | בניית production |
 | `npm run preview` | תצוגה מקומית של build |
 | `npm test` | בדיקות יחידה (Vitest) |
-
-## Seed Data
-
-נתוני הדגמה ב-`src/seed/data.ts`:
-
-- משק בית: משפחת כהן
-- תרומות קבועות: ישיבה (₪500), גמ"ח (₪200)
-- דוחות: אפריל ומאי 2025 עם חוב מעשר מצטבר
-
-לאפס את מצב ההדגמה:
-
-```js
-localStorage.removeItem('household-tithing-demo')
-```
 
 ## רישיון
 

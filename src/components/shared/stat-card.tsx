@@ -1,31 +1,37 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { formatShekels } from '@/utils/currency'
 import { cn } from '@/lib/utils'
 
 interface StatCardProps {
   title: string
   value: number
-  variant?: 'default' | 'danger' | 'success' | 'warning'
   subtitle?: string
+  variant?: 'default' | 'due' | 'credit' | 'neutral'
 }
 
-export function StatCard({ title, value, variant = 'default', subtitle }: StatCardProps) {
+export function StatCard({
+  title,
+  value,
+  subtitle,
+  variant = 'default',
+}: StatCardProps) {
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-slate-500">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
+    <Card className="overflow-hidden">
+      <CardContent className="p-5">
+        <p className="text-sm font-medium text-[var(--color-muted-foreground)]">{title}</p>
         <p
-          className={cn('text-2xl font-bold', {
-            'text-red-600': variant === 'danger',
-            'text-green-600': variant === 'success',
-            'text-amber-600': variant === 'warning',
+          className={cn('mt-2 text-3xl font-bold tabular-nums tracking-tight', {
+            'text-red-600': variant === 'due',
+            'text-emerald-600': variant === 'credit',
+            'text-indigo-700': variant === 'default',
+            'text-[var(--color-foreground)]': variant === 'neutral',
           })}
         >
           {formatShekels(value)}
         </p>
-        {subtitle && <p className="mt-1 text-xs text-slate-500">{subtitle}</p>}
+        {subtitle && (
+          <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">{subtitle}</p>
+        )}
       </CardContent>
     </Card>
   )

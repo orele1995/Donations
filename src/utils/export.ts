@@ -5,18 +5,17 @@ import type { MonthlyReport } from '@/types'
 import { formatMonthLabel } from '@/utils/dates'
 import { formatShekels } from '@/utils/currency'
 
-function reportToRows(
-  report: MonthlyReport,
-  creditEnabled: boolean,
-): (string | number)[][] {
+function reportToRows(report: MonthlyReport): (string | number)[][] {
   const monthLabel = formatMonthLabel(report.year, report.month)
   const rows: (string | number)[][] = [
     [labels.month, monthLabel],
     [],
     [labels.income, ''],
-    [labels.salaryHusband, formatShekels(report.salaryHusband)],
-    [labels.salaryWife, formatShekels(report.salaryWife)],
   ]
+
+  report.memberIncomes.forEach((entry) => {
+    rows.push([entry.memberName, formatShekels(entry.amount)])
+  })
 
   report.additionalIncome.forEach((entry) => {
     rows.push([entry.description, formatShekels(entry.amount)])
@@ -26,11 +25,14 @@ function reportToRows(
     [labels.totalIncome, formatShekels(report.totalIncome)],
     [],
     [labels.maaserRequired, formatShekels(report.maaserRequired)],
-    [labels.openingDebt, formatShekels(report.openingDebt)],
+    [labels.debtFromPreviousMonths, formatShekels(report.openingDebt)],
   )
 
-  if (creditEnabled) {
-    rows.push([labels.openingCredit, formatShekels(report.openingCredit)])
+  if (report.creditFromPreviousMonth > 0) {
+    rows.push([labels.creditFromPreviousMonth, formatShekels(report.creditFromPreviousMonth)])
+    if (report.applyCreditFromPrevious) {
+      rows.push([labels.applyCreditFromPrevious, formatShekels(report.openingCredit)])
+    }
   }
 
   rows.push(
@@ -56,22 +58,14 @@ function reportToRows(
   rows.push(
     [labels.oneTimeDonationsTotal, formatShekels(report.oneTimeDonationsTotal)],
     [],
-    [labels.remainingBalance, formatShekels(report.remainingBalance)],
-    [labels.closingDebt, formatShekels(report.closingDebt)],
+    [labels.finalBalance, formatShekels(Math.max(report.remainingBalance, 0))],
   )
-
-  if (creditEnabled) {
-    rows.push([labels.closingCredit, formatShekels(report.closingCredit)])
-  }
 
   return rows
 }
 
-export function exportReportToExcel(
-  report: MonthlyReport,
-  creditEnabled: boolean,
-): void {
-  const rows = reportToRows(report, creditEnabled)
+export function exportReportToExcel(report: MonthlyReport): void {
+  const rows = reportToRows(report)
   const worksheet = XLSX.utils.aoa_to_sheet(rows)
   const workbook = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(workbook, worksheet, 'דוח')
@@ -80,25 +74,5 @@ export function exportReportToExcel(
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   })
   const filename = `דוח-${report.year}-${String(report.month).padStart(2, '0')}.xlsx`
-  saveAs(blob, filename)
-}
-
-export function exportReportToCsv(
-  report: MonthlyReport,
-  creditEnabled: boolean,
-): void {
-  const rows = reportToRows(report, creditEnabled)
-  const csv = rows
-    .map((row) =>
-      row
-        .map((cell) => {
-          const str = String(cell)
-          return str.includes(',') ? `"${str.replace(/"/g, '""')}"` : str
-        })
-        .join(','),
-    )
-    .join('\n')
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
-  const filename = `דוח-${report.year}-${String(report.month).padStart(2, '0')}.csv`
   saveAs(blob, filename)
 }

@@ -55,15 +55,11 @@ export async function createHousehold(
     joinedAt: now,
   })
 
-  await setDoc(
-    doc(db, COLLECTIONS.householdSettings, householdRef.id),
-    {
-      householdId: householdRef.id,
-      creditCarryForwardEnabled: false,
-      updatedAt: now,
-      updatedBy: userId,
-    },
-  )
+  await setDoc(doc(db, COLLECTIONS.householdSettings, householdRef.id), {
+    householdId: householdRef.id,
+    updatedAt: now,
+    updatedBy: userId,
+  })
 
   await updateDoc(doc(db, COLLECTIONS.userProfiles, userId), {
     activeHouseholdId: householdRef.id,
@@ -183,6 +179,16 @@ export async function fetchMembers(
   })
 }
 
+export async function updateMemberDisplayName(
+  db: Firestore,
+  memberId: string,
+  displayName: string,
+): Promise<void> {
+  await updateDoc(doc(db, COLLECTIONS.householdMembers, memberId), {
+    displayName,
+  })
+}
+
 export async function fetchSettings(
   db: Firestore,
   householdId: string,
@@ -194,7 +200,6 @@ export async function fetchSettings(
     return {
       id: householdId,
       householdId,
-      creditCarryForwardEnabled: false,
       updatedAt: new Date().toISOString(),
       updatedBy: '',
     }
@@ -203,28 +208,9 @@ export async function fetchSettings(
   return {
     id: snap.id,
     householdId: data.householdId as string,
-    creditCarryForwardEnabled: data.creditCarryForwardEnabled as boolean,
     updatedAt: data.updatedAt as string,
     updatedBy: data.updatedBy as string,
   }
-}
-
-export async function updateSettings(
-  db: Firestore,
-  householdId: string,
-  creditCarryForwardEnabled: boolean,
-  userId: string,
-): Promise<void> {
-  await setDoc(
-    doc(db, COLLECTIONS.householdSettings, householdId),
-    {
-      householdId,
-      creditCarryForwardEnabled,
-      updatedAt: new Date().toISOString(),
-      updatedBy: userId,
-    },
-    { merge: true },
-  )
 }
 
 export async function createInvite(

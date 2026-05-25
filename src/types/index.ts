@@ -1,10 +1,6 @@
 export type MemberRole = 'owner' | 'member'
 
-export type AuditActionType =
-  | 'create'
-  | 'update'
-  | 'delete'
-  | 'restore'
+export type AuditActionType = 'create' | 'update' | 'delete' | 'restore'
 
 export type AuditEntityType =
   | 'monthlyReport'
@@ -13,6 +9,7 @@ export type AuditEntityType =
   | 'oneTimeDonation'
   | 'householdSettings'
   | 'household'
+  | 'householdMember'
 
 export interface Household {
   id: string
@@ -35,7 +32,6 @@ export interface HouseholdMember {
 export interface HouseholdSettings {
   id: string
   householdId: string
-  creditCarryForwardEnabled: boolean
   updatedAt: string
   updatedBy: string
 }
@@ -47,6 +43,12 @@ export interface HouseholdInvite {
   createdBy: string
   createdAt: string
   expiresAt: string
+}
+
+export interface MemberIncomeEntry {
+  memberId: string
+  memberName: string
+  amount: number
 }
 
 export interface AdditionalIncomeEntry {
@@ -74,11 +76,12 @@ export interface MonthlyReport {
   householdId: string
   year: number
   month: number
-  salaryHusband: number
-  salaryWife: number
+  memberIncomes: MemberIncomeEntry[]
   additionalIncome: AdditionalIncomeEntry[]
   oneTimeDonations: OneTimeDonation[]
   fixedDonationSnapshots: FixedDonationSnapshot[]
+  applyCreditFromPrevious: boolean
+  creditFromPreviousMonth: number
   totalIncome: number
   maaserRequired: number
   openingDebt: number
@@ -93,6 +96,10 @@ export interface MonthlyReport {
   updatedAt: string
   createdBy: string
   updatedBy: string
+  /** @deprecated Legacy – migrated to memberIncomes on read */
+  salaryHusband?: number
+  /** @deprecated Legacy – migrated to memberIncomes on read */
+  salaryWife?: number
 }
 
 export interface FixedDonation {
@@ -133,6 +140,7 @@ export interface ReportCalculations {
   remainingBalance: number
   closingDebt: number
   closingCredit: number
+  maaserPaidTotal: number
 }
 
 export interface MonthKey {
@@ -147,3 +155,5 @@ export interface UserProfile {
   photoURL: string | null
   activeHouseholdId: string | null
 }
+
+export type MonthStatus = 'positive' | 'negative' | 'balanced'

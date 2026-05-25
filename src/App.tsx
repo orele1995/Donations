@@ -7,12 +7,14 @@ import { LoginPage } from '@/pages/login-page'
 import { OnboardingPage } from '@/pages/onboarding-page'
 import { DashboardPage } from '@/pages/dashboard-page'
 import { ReportsPage } from '@/pages/reports-page'
+import { NewReportPage } from '@/pages/new-report-page'
 import { ReportEditPage } from '@/pages/report-edit-page'
 import { FixedDonationsPage } from '@/pages/fixed-donations-page'
 import { AuditPage } from '@/pages/audit-page'
 import { SettingsPage } from '@/pages/settings-page'
 import { MembersPage } from '@/pages/members-page'
 import { LoadingSkeleton } from '@/components/shared/loading-skeleton'
+import { isFirebaseConfigured } from '@/lib/firebase'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,7 +26,7 @@ const queryClient = new QueryClient({
 })
 
 function ProtectedRoutes() {
-  const { profile, isLoading, user, isDemo } = useAuth()
+  const { profile, isLoading, user } = useAuth()
 
   if (isLoading) {
     return (
@@ -34,7 +36,7 @@ function ProtectedRoutes() {
     )
   }
 
-  if (!user && !isDemo) {
+  if (!user) {
     return <Navigate to="/login" replace />
   }
 
@@ -47,7 +49,7 @@ function ProtectedRoutes() {
       <Route element={<AppShell />}>
         <Route index element={<DashboardPage />} />
         <Route path="reports" element={<ReportsPage />} />
-        <Route path="reports/new" element={<ReportEditPage />} />
+        <Route path="reports/new" element={<NewReportPage />} />
         <Route path="reports/:year/:month" element={<ReportEditPage />} />
         <Route path="fixed-donations" element={<FixedDonationsPage />} />
         <Route path="audit" element={<AuditPage />} />
@@ -60,7 +62,15 @@ function ProtectedRoutes() {
 }
 
 function AppRoutes() {
-  const { user, isDemo, isLoading } = useAuth()
+  const { user, isLoading } = useAuth()
+
+  if (!isFirebaseConfigured()) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-8">
+        <LoginPage />
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (
@@ -74,7 +84,7 @@ function AppRoutes() {
     <Routes>
       <Route
         path="/login"
-        element={user || isDemo ? <Navigate to="/" replace /> : <LoginPage />}
+        element={user ? <Navigate to="/" replace /> : <LoginPage />}
       />
       <Route path="/*" element={<ProtectedRoutes />} />
     </Routes>

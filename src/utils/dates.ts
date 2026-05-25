@@ -1,5 +1,5 @@
 import { MONTH_NAMES_HE } from '@/lib/constants'
-import type { MonthKey } from '@/types'
+import type { MonthKey, MonthStatus } from '@/types'
 
 export function toMonthKey(year: number, month: number): string {
   return `${year}-${String(month).padStart(2, '0')}`
@@ -50,4 +50,21 @@ export function isFullMonthActive(
 export function currentMonthKey(): MonthKey {
   const now = new Date()
   return { year: now.getFullYear(), month: now.getMonth() + 1 }
+}
+
+/** Default for new report = previous calendar month */
+export function defaultNewReportMonth(): MonthKey {
+  const now = currentMonthKey()
+  return getPreviousMonth(now.year, now.month)
+}
+
+export function getMonthStatus(remainingBalance: number): MonthStatus {
+  if (remainingBalance > 0) return 'positive'
+  if (remainingBalance < 0) return 'negative'
+  return 'balanced'
+}
+
+export function compareMonthKeys(a: MonthKey, b: MonthKey): number {
+  if (a.year !== b.year) return a.year - b.year
+  return a.month - b.month
 }

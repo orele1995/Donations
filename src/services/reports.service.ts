@@ -13,51 +13,34 @@ import {
 import { COLLECTIONS } from '@/lib/constants'
 import { generateId } from '@/lib/utils'
 import { getPreviousMonth } from '@/utils/dates'
-import { computeReportCalculations } from '@/utils/finance'
+import {
+  computeReportCalculations,
+  getAppliedCredit,
+} from '@/utils/finance'
 import { isFullMonthActive } from '@/utils/dates'
+import { normalizeReport } from '@/utils/report-migration'
 import { createAuditLog } from '@/services/audit.service'
+import * as householdService from '@/services/household.service'
 import type {
   FixedDonation,
   FixedDonationSnapshot,
+  HouseholdMember,
+  MemberIncomeEntry,
   MonthlyReport,
 } from '@/types'
 
-function mapReportDoc(
-  id: string,
-  data: Record<string, unknown>,
-): MonthlyReport {
-  return {
-    id,
-    householdId: data.householdId as string,
-    year: data.year as number,
-    month: data.month as number,
-    salaryHusband: data.salaryHusband as number,
-    salaryWife: data.salaryWife as number,
-    additionalIncome: data.additionalIncome as MonthlyReport['additionalIncome'],
-    oneTimeDonations: data.oneTimeDonations as MonthlyReport['oneTimeDonations'],
-    fixedDonationSnapshots:
-      data.fixedDonationSnapshots as MonthlyReport['fixedDonationSnapshots'],
-    totalIncome: data.totalIncome as number,
-    maaserRequired: data.maaserRequired as number,
-    openingDebt: data.openingDebt as number,
-    openingCredit: data.openingCredit as number,
-    adjustedMaaserRequirement: data.adjustedMaaserRequirement as number,
-    fixedDonationsTotal: data.fixedDonationsTotal as number,
-    oneTimeDonationsTotal: data.oneTimeDonationsTotal as number,
-    remainingBalance: data.remainingBalance as number,
-    closingDebt: data.closingDebt as number,
-    closingCredit: data.closingCredit as number,
-    createdAt: data.createdAt as string,
-    updatedAt: data.updatedAt as string,
-    createdBy: data.createdBy as string,
-    updatedBy: data.updatedBy as string,
-  }
+async function getMembersForHousehold(
+  db: Firestore,
+  householdId: string,
+): Promise<HouseholdMember[]> {
+  return householdService.fetchMembers(db, householdId)
 }
 
 export async function fetchReports(
   db: Firestore,
   householdId: string,
 ): Promise<MonthlyReport[]> {
+  const members = await getMembersForHousehold(db, householdId)
   const q = query(
     collection(db, COLLECTIONS.monthlyReports),
     where('householdId', '==', householdId),
@@ -65,7 +48,7 @@ export async function fetchReports(
     orderBy('month', 'desc'),
   )
   const snap = await getDocs(q)
-  return snap.docs.map((d) => mapReportDoc(d.id, d.data()))
+  return snap.docs.map((d) => normalizeReport(d.id, d.data(), members))
 }
 
 export async function fetchReportByMonth(
@@ -74,6 +57,7 @@ export async function fetchReportByMonth(
   year: number,
   month: number,
 ): Promise<MonthlyReport | null> {
+  const members = await getMembersForHousehold(db, householdId)
   const q = query(
     collection(db, COLLECTIONS.monthlyReports),
     where('householdId', '==', householdId),
@@ -83,7 +67,17 @@ export async function fetchReportByMonth(
   const snap = await getDocs(q)
   const first = snap.docs[0]
   if (!first) return null
-  return mapReportDoc(first.id, first.data())
+  return normalizeReport(first.id, first.data(), members)
+}
+
+export async function reportExists(
+  db: Firestore,
+  householdId: string,
+  year: number,
+  month: number,
+): Promise<boolean> {
+  const report = await fetchReportByMonth(db, householdId, year, month)
+  return report !== null
 }
 
 export function buildFixedSnapshots(
@@ -109,14 +103,32 @@ export function buildFixedSnapshots(
     }))
 }
 
+export function buildDefaultMemberIncomes(
+  members: HouseholdMember[],
+  prevIncomes?: MemberIncomeEntry[],
+): MemberIncomeEntry[] {
+  return members.map((m) => {
+    const prev = prevIncomes?.find((e) => e.memberId === m.id)
+    return {
+      memberId: m.id,
+      memberName: m.displayName,
+      amount: prev?.amount ?? 0,
+    }
+  })
+}
+
 export async function getOpeningBalances(
   db: Firestore,
   householdId: string,
   year: number,
   month: number,
-  creditCarryForwardEnabled: boolean,
-): Promise<{ openingDebt: number; openingCredit: number; prevSalaries: { husband: number; wife: number } }> {
+): Promise<{
+  openingDebt: number
+  creditFromPreviousMonth: number
+  prevMemberIncomes: MemberIncomeEntry[]
+}> {
   const prev = getPreviousMonth(year, month)
+  const members = await getMembersForHousehold(db, householdId)
   const prevReport = await fetchReportByMonth(
     db,
     householdId,
@@ -127,18 +139,15 @@ export async function getOpeningBalances(
   if (!prevReport) {
     return {
       openingDebt: 0,
-      openingCredit: 0,
-      prevSalaries: { husband: 0, wife: 0 },
+      creditFromPreviousMonth: 0,
+      prevMemberIncomes: buildDefaultMemberIncomes(members),
     }
   }
 
   return {
     openingDebt: prevReport.closingDebt,
-    openingCredit: creditCarryForwardEnabled ? prevReport.closingCredit : 0,
-    prevSalaries: {
-      husband: prevReport.salaryHusband,
-      wife: prevReport.salaryWife,
-    },
+    creditFromPreviousMonth: prevReport.closingCredit,
+    prevMemberIncomes: prevReport.memberIncomes,
   }
 }
 
@@ -154,22 +163,27 @@ export function buildReportPayload(
     | 'remainingBalance'
     | 'closingDebt'
     | 'closingCredit'
+    | 'openingCredit'
   >,
-  creditCarryForwardEnabled: boolean,
 ): Omit<MonthlyReport, 'id'> {
+  const openingCredit = getAppliedCredit(
+    partial.applyCreditFromPrevious,
+    partial.creditFromPreviousMonth,
+  )
+
   const calc = computeReportCalculations({
-    salaryHusband: partial.salaryHusband,
-    salaryWife: partial.salaryWife,
+    memberIncomes: partial.memberIncomes,
     additionalIncome: partial.additionalIncome,
     fixedDonationSnapshots: partial.fixedDonationSnapshots,
     oneTimeDonations: partial.oneTimeDonations,
     openingDebt: partial.openingDebt,
-    openingCredit: partial.openingCredit,
-    creditCarryForwardEnabled,
+    applyCreditFromPrevious: partial.applyCreditFromPrevious,
+    creditFromPreviousMonth: partial.creditFromPreviousMonth,
   })
 
   return {
     ...partial,
+    openingCredit,
     ...calc,
   }
 }
@@ -177,13 +191,12 @@ export function buildReportPayload(
 export async function saveReport(
   db: Firestore,
   report: MonthlyReport,
-  creditCarryForwardEnabled: boolean,
   userId: string,
   userDisplayName: string,
   isNew: boolean,
   beforeState: Record<string, unknown> | null,
 ): Promise<MonthlyReport> {
-  const payload = buildReportPayload(report, creditCarryForwardEnabled)
+  const payload = buildReportPayload(report)
   const now = new Date().toISOString()
   const data = {
     ...payload,
@@ -255,32 +268,13 @@ export async function deleteReport(
   })
 }
 
-export async function restoreReport(
-  db: Firestore,
-  report: MonthlyReport,
-  userId: string,
-  userDisplayName: string,
-): Promise<void> {
-  await setDoc(doc(db, COLLECTIONS.monthlyReports, report.id), report)
-  await createAuditLog(db, {
-    householdId: report.householdId,
-    userId,
-    userDisplayName,
-    actionType: 'restore',
-    entityType: 'monthlyReport',
-    entityId: report.id,
-    beforeState: null,
-    afterState: report as unknown as Record<string, unknown>,
-    year: report.year,
-    month: report.month,
-  })
-}
-
 export async function getReport(
   db: Firestore,
   reportId: string,
+  householdId: string,
 ): Promise<MonthlyReport | null> {
+  const members = await getMembersForHousehold(db, householdId)
   const snap = await getDoc(doc(db, COLLECTIONS.monthlyReports, reportId))
   if (!snap.exists()) return null
-  return mapReportDoc(snap.id, snap.data())
+  return normalizeReport(snap.id, snap.data(), members)
 }

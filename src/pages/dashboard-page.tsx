@@ -1,128 +1,209 @@
 import { useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Bar,
   BarChart,
   CartesianGrid,
-  Legend,
+  Cell,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
 import { labels } from '@/lib/hebrew'
-import { useReports, useSettings } from '@/hooks/use-household-data'
+import { useReports } from '@/hooks/use-household-data'
 import { StatCard } from '@/components/shared/stat-card'
 import { LoadingSkeleton } from '@/components/shared/loading-skeleton'
-import { formatMonthLabel } from '@/utils/dates'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  currentMonthKey,
+  formatMonthLabel,
+  getMonthStatus,
+  getPreviousMonth,
+} from '@/utils/dates'
 import { agorotToShekels } from '@/utils/currency'
 import { MONTH_NAMES_HE } from '@/lib/constants'
+import type { MonthlyReport } from '@/types'
+
+const STATUS_COLORS = {
+  positive: '#ef4444',
+  negative: '#10b981',
+  balanced: '#a5b4fc',
+}
+
+const STATUS_LABELS = {
+  positive: labels.statusPositive,
+  negative: labels.statusNegative,
+  balanced: labels.statusBalanced,
+}
+
+function findReport(
+  reports: MonthlyReport[],
+  year: number,
+  month: number,
+): MonthlyReport | undefined {
+  return reports.find((r) => r.year === year && r.month === month)
+}
+
+function netBalance(report: MonthlyReport): number {
+  return Math.max(report.remainingBalance, 0)
+}
 
 export function DashboardPage() {
   const { data: reports, isLoading } = useReports()
-  const { data: settings } = useSettings()
+  const current = currentMonthKey()
+  const previous = getPreviousMonth(current.year, current.month)
 
-  const latest = reports?.[0]
-  const creditEnabled = settings?.creditCarryForwardEnabled ?? false
+  const currentReport = useMemo(
+    () => (reports ? findReport(reports, current.year, current.month) : undefined),
+    [reports, current.year, current.month],
+  )
 
-  const chartData = useMemo(() => {
+  const lastReport = useMemo(
+    () => (reports ? findReport(reports, previous.year, previous.month) : undefined),
+    [reports, previous.year, previous.month],
+  )
+
+  const statusChartData = useMemo(() => {
     if (!reports) return []
-    const byYear = new Map<number, { income: number; maaser: number; donations: number }>()
-    for (const r of reports) {
-      const existing = byYear.get(r.year) ?? { income: 0, maaser: 0, donations: 0 }
-      existing.income += r.totalIncome
-      existing.maaser += r.maaserRequired
-      existing.donations += r.fixedDonationsTotal + r.oneTimeDonationsTotal
-      byYear.set(r.year, existing)
-    }
-    return Array.from(byYear.entries()).map(([year, data]) => ({
-      year: String(year),
-      הכנסות: agorotToShekels(data.income),
-      מעשר: agorotToShekels(data.maaser),
-      תרומות: agorotToShekels(data.donations),
-    }))
+    return [...reports]
+      .sort((a, b) => a.year - b.year || a.month - b.month)
+      .slice(-12)
+      .map((r) => {
+        const status = getMonthStatus(r.remainingBalance)
+        return {
+          name: MONTH_NAMES_HE[r.month - 1]?.slice(0, 3) ?? String(r.month),
+          status: STATUS_LABELS[status],
+          statusKey: status,
+          value: 1,
+        }
+      })
   }, [reports])
 
-  const monthlyChart = useMemo(() => {
+  const paidChartData = useMemo(() => {
     if (!reports) return []
     return [...reports]
       .sort((a, b) => a.year - b.year || a.month - b.month)
       .slice(-12)
       .map((r) => ({
         name: MONTH_NAMES_HE[r.month - 1]?.slice(0, 3) ?? String(r.month),
-        יתרה: agorotToShekels(Math.max(r.remainingBalance, 0)),
-        חוב: agorotToShekels(r.closingDebt),
+        paid: agorotToShekels(r.fixedDonationsTotal + r.oneTimeDonationsTotal),
       }))
   }, [reports])
 
-  if (isLoading) return <LoadingSkeleton rows={6} />
-
-  if (!latest) {
-    return (
-      <div>
-        <h1 className="mb-6 text-2xl font-bold">{labels.dashboard}</h1>
-        <p className="text-slate-500">{labels.noData}</p>
-      </div>
-    )
-  }
+  if (isLoading) return <LoadingSkeleton rows={4} />
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">{labels.dashboard}</h1>
-        <p className="text-slate-500">
-          {formatMonthLabel(latest.year, latest.month)} — עדכון אחרון
-        </p>
+    <div className="space-y-8">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">{labels.dashboard}</h1>
+          <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
+            {formatMonthLabel(current.year, current.month)}
+          </p>
+        </div>
+        <Button asChild>
+          <Link to="/reports/new">{labels.newReport}</Link>
+        </Button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        <StatCard title={labels.totalIncome} value={latest.totalIncome} />
-        <StatCard title={labels.maaserRequired} value={latest.maaserRequired} variant="warning" />
-        <StatCard title={labels.maaserDebt} value={latest.closingDebt} variant="danger" />
-        {creditEnabled && (
-          <StatCard title={labels.maaserCredit} value={latest.closingCredit} variant="success" />
-        )}
-        <StatCard title={labels.fixedDonationsTotal} value={latest.fixedDonationsTotal} />
+      <div className="grid gap-4 sm:grid-cols-2">
         <StatCard
-          title={labels.remainingBalance}
-          value={Math.max(latest.remainingBalance, 0)}
-          variant={latest.remainingBalance > 0 ? 'danger' : 'success'}
+          title={labels.currentMonthBalance}
+          value={currentReport ? netBalance(currentReport) : 0}
+          subtitle={
+            currentReport
+              ? formatMonthLabel(current.year, current.month)
+              : labels.noData
+          }
+          variant={currentReport && currentReport.remainingBalance > 0 ? 'due' : 'neutral'}
+        />
+        <StatCard
+          title={labels.lastMonthBalance}
+          value={lastReport ? netBalance(lastReport) : 0}
+          subtitle={
+            lastReport
+              ? formatMonthLabel(previous.year, previous.month)
+              : labels.noData
+          }
+          variant={lastReport && lastReport.remainingBalance > 0 ? 'due' : 'neutral'}
         />
       </div>
 
-      <section>
-        <h2 className="mb-4 text-lg font-semibold">{labels.annualOverview}</h2>
-        <div className="h-80 rounded-lg border bg-white p-4">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="year" />
-              <YAxis />
-              <Tooltip formatter={(v) => `₪${Number(v ?? 0).toLocaleString('he-IL')}`} />
-              <Legend />
-              <Bar dataKey="הכנסות" fill="#0f766e" />
-              <Bar dataKey="מעשר" fill="#f59e0b" />
-              <Bar dataKey="תרומות" fill="#6366f1" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </section>
+      {reports && reports.length > 0 ? (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{labels.monthlyStatusChart}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={statusChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e8e6f0" />
+                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                    <YAxis hide />
+                    <Tooltip />
+                    <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                      {statusChartData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={STATUS_COLORS[entry.statusKey as keyof typeof STATUS_COLORS]}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-4 text-xs text-[var(--color-muted-foreground)]">
+                <span className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-red-500" />
+                  {labels.statusPositive}
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  {labels.statusNegative}
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-indigo-300" />
+                  {labels.statusBalanced}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
 
-      <section>
-        <h2 className="mb-4 text-lg font-semibold">יתרות חודשיות</h2>
-        <div className="h-64 rounded-lg border bg-white p-4">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={monthlyChart}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip formatter={(v) => `₪${Number(v ?? 0).toLocaleString('he-IL')}`} />
-              <Legend />
-              <Bar dataKey="יתרה" fill="#dc2626" />
-              <Bar dataKey="חוב" fill="#991b1b" />
-            </BarChart>
-          </ResponsiveContainer>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{labels.monthlyMaaserPaidChart}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={paidChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e8e6f0" />
+                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 12 }} />
+                    <Tooltip
+                      formatter={(v) => `₪${Number(v ?? 0).toLocaleString('he-IL')}`}
+                    />
+                    <Bar dataKey="paid" fill="#6366f1" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </section>
+      ) : (
+        <Card className="border-dashed">
+          <CardContent className="py-12 text-center text-[var(--color-muted-foreground)]">
+            <p>{labels.noData}</p>
+            <Button asChild className="mt-4">
+              <Link to="/reports/new">{labels.newReport}</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

@@ -32,11 +32,6 @@ export const fixedDonationSchema = z.object({
   endMonth: z.number().int().min(1).max(12).nullable(),
 })
 
-export const monthlyReportIncomeSchema = z.object({
-  salaryHusband: shekelAmountSchema,
-  salaryWife: shekelAmountSchema,
-})
-
 export type HouseholdNameForm = z.infer<typeof householdNameSchema>
 export type InviteCodeForm = z.infer<typeof inviteCodeSchema>
 export type FixedDonationForm = z.infer<typeof fixedDonationSchema>

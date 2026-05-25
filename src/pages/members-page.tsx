@@ -15,12 +15,12 @@ import type { HouseholdMember } from '@/types'
 
 export function MembersPage() {
   const { data: members, isLoading } = useMembers()
+  const { user } = useAuth()
   const invalidate = useInvalidateHousehold()
-  const { user, isDemo } = useAuth()
   const [inviteCode, setInviteCode] = useState<string | null>(null)
 
   const currentMember = members?.find((m) => m.userId === user?.uid)
-  const isOwner = currentMember?.role === 'owner' || isDemo
+  const isOwner = currentMember?.role === 'owner'
 
   const handleInvite = async (): Promise<void> => {
     if (!db || !user || !currentMember) return
@@ -60,16 +60,16 @@ export function MembersPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{labels.members}</h1>
-        {isOwner && !isDemo && (
+        <h1 className="text-2xl font-bold tracking-tight">{labels.members}</h1>
+        {isOwner && (
           <Button onClick={() => void handleInvite()}>{labels.generateInvite}</Button>
         )}
       </div>
 
       {inviteCode && (
-        <Card className="border-teal-200 bg-teal-50">
-          <CardContent className="flex items-center justify-between pt-4">
-            <code className="text-lg font-mono" dir="ltr">
+        <Card className="border-indigo-200 bg-indigo-50/50">
+          <CardContent className="flex items-center justify-between gap-4 pt-5">
+            <code className="text-lg font-mono text-indigo-800" dir="ltr">
               {inviteCode}
             </code>
             <Button variant="outline" size="sm" onClick={copyCode}>
@@ -80,27 +80,23 @@ export function MembersPage() {
         </Card>
       )}
 
-      {isDemo && (
-        <p className="text-sm text-amber-700">קוד הזמנה להדגמה: DEMO1234</p>
-      )}
-
       {!members?.length ? (
         <EmptyState icon={Users} />
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {members.map((member) => (
             <Card key={member.id}>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-row items-center justify-between gap-2">
                 <CardTitle className="text-base">{member.displayName}</CardTitle>
-                <span className="rounded bg-slate-100 px-2 py-1 text-xs">
+                <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-800">
                   {member.role === 'owner' ? labels.owner : labels.member}
                 </span>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-slate-500" dir="ltr">
+                <p className="text-sm text-[var(--color-muted-foreground)]" dir="ltr">
                   {member.email}
                 </p>
-                {isOwner && member.role !== 'owner' && !isDemo && (
+                {isOwner && member.role !== 'owner' && (
                   <Button
                     variant="destructive"
                     size="sm"

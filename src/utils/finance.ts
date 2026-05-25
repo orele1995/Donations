@@ -2,17 +2,18 @@ import { MAASER_RATE } from '@/lib/constants'
 import type {
   AdditionalIncomeEntry,
   FixedDonationSnapshot,
+  MemberIncomeEntry,
   OneTimeDonation,
   ReportCalculations,
 } from '@/types'
 
 export function calculateTotalIncome(
-  salaryHusband: number,
-  salaryWife: number,
+  memberIncomes: MemberIncomeEntry[],
   additionalIncome: AdditionalIncomeEntry[],
 ): number {
+  const members = memberIncomes.reduce((sum, e) => sum + e.amount, 0)
   const additional = additionalIncome.reduce((sum, e) => sum + e.amount, 0)
-  return salaryHusband + salaryWife + additional
+  return members + additional
 }
 
 export function calculateMaaserRequired(totalIncome: number): number {
@@ -22,11 +23,9 @@ export function calculateMaaserRequired(totalIncome: number): number {
 export function calculateAdjustedMaaserRequirement(
   maaserRequired: number,
   openingDebt: number,
-  openingCredit: number,
-  creditCarryForwardEnabled: boolean,
+  appliedCredit: number,
 ): number {
-  const creditReduction = creditCarryForwardEnabled ? openingCredit : 0
-  const adjusted = maaserRequired + openingDebt - creditReduction
+  const adjusted = maaserRequired + openingDebt - appliedCredit
   return Math.max(adjusted, 0)
 }
 
@@ -46,46 +45,49 @@ export function calculateRemainingBalance(
   return adjustedRequirement - fixedDonationsTotal - oneTimeDonationsTotal
 }
 
-export function calculateClosingBalances(
-  remainingBalance: number,
-  creditCarryForwardEnabled: boolean,
-): { closingDebt: number; closingCredit: number } {
+export function calculateClosingBalances(remainingBalance: number): {
+  closingDebt: number
+  closingCredit: number
+} {
   if (remainingBalance > 0) {
     return { closingDebt: remainingBalance, closingCredit: 0 }
   }
+  return { closingDebt: 0, closingCredit: Math.abs(remainingBalance) }
+}
 
-  const overpayment = Math.abs(remainingBalance)
-  return {
-    closingDebt: 0,
-    closingCredit: creditCarryForwardEnabled ? overpayment : overpayment,
-  }
+export function getMaaserPaidTotal(
+  fixedDonationsTotal: number,
+  oneTimeDonationsTotal: number,
+): number {
+  return fixedDonationsTotal + oneTimeDonationsTotal
 }
 
 export interface ComputeReportInput {
-  salaryHusband: number
-  salaryWife: number
+  memberIncomes: MemberIncomeEntry[]
   additionalIncome: AdditionalIncomeEntry[]
   fixedDonationSnapshots: FixedDonationSnapshot[]
   oneTimeDonations: OneTimeDonation[]
   openingDebt: number
-  openingCredit: number
-  creditCarryForwardEnabled: boolean
+  applyCreditFromPrevious: boolean
+  creditFromPreviousMonth: number
 }
 
 export function computeReportCalculations(
   input: ComputeReportInput,
 ): ReportCalculations {
+  const appliedCredit = input.applyCreditFromPrevious
+    ? input.creditFromPreviousMonth
+    : 0
+
   const totalIncome = calculateTotalIncome(
-    input.salaryHusband,
-    input.salaryWife,
+    input.memberIncomes,
     input.additionalIncome,
   )
   const maaserRequired = calculateMaaserRequired(totalIncome)
   const adjustedMaaserRequirement = calculateAdjustedMaaserRequirement(
     maaserRequired,
     input.openingDebt,
-    input.openingCredit,
-    input.creditCarryForwardEnabled,
+    appliedCredit,
   )
   const fixedDonationsTotal = sumFixedDonations(input.fixedDonationSnapshots)
   const oneTimeDonationsTotal = sumOneTimeDonations(input.oneTimeDonations)
@@ -94,9 +96,10 @@ export function computeReportCalculations(
     fixedDonationsTotal,
     oneTimeDonationsTotal,
   )
-  const { closingDebt, closingCredit } = calculateClosingBalances(
-    remainingBalance,
-    input.creditCarryForwardEnabled,
+  const { closingDebt, closingCredit } = calculateClosingBalances(remainingBalance)
+  const maaserPaidTotal = getMaaserPaidTotal(
+    fixedDonationsTotal,
+    oneTimeDonationsTotal,
   )
 
   return {
@@ -108,5 +111,13 @@ export function computeReportCalculations(
     remainingBalance,
     closingDebt,
     closingCredit,
+    maaserPaidTotal,
   }
+}
+
+export function getAppliedCredit(
+  applyCreditFromPrevious: boolean,
+  creditFromPreviousMonth: number,
+): number {
+  return applyCreditFromPrevious ? creditFromPreviousMonth : 0
 }
