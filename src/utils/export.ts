@@ -28,18 +28,11 @@ function reportToRows(report: MonthlyReport): (string | number)[][] {
     [labels.debtFromPreviousMonths, formatShekels(report.openingDebt)],
   )
 
-  if (report.creditFromPreviousMonth > 0) {
-    rows.push([labels.creditFromPreviousMonth, formatShekels(report.creditFromPreviousMonth)])
-    if (report.applyCreditFromPrevious) {
-      rows.push([labels.applyCreditFromPrevious, formatShekels(report.openingCredit)])
-    }
+  if (report.applyCreditFromPrevious && report.openingCredit > 0) {
+    rows.push([labels.applyCreditFromPrevious, formatShekels(report.openingCredit)])
   }
 
-  rows.push(
-    [labels.adjustedRequirement, formatShekels(report.adjustedMaaserRequirement)],
-    [],
-    [labels.fixedDonations, ''],
-  )
+  rows.push([], [labels.fixedDonations, ''])
 
   report.fixedDonationSnapshots.forEach((snap) => {
     rows.push([snap.name, formatShekels(snap.amount)])

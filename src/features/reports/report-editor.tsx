@@ -34,6 +34,7 @@ import { toast } from '@/hooks/use-toast'
 import { getHebrewErrorMessage } from '@/utils/errors'
 import { formatMonthLabel } from '@/utils/dates'
 import { formatShekels } from '@/utils/currency'
+import { resolveMemberDisplayName } from '@/lib/member-display'
 import { useQueryClient } from '@tanstack/react-query'
 
 interface ReportEditorProps {
@@ -113,6 +114,21 @@ export function ReportEditor({ year, month, isNew }: ReportEditorProps) {
     if (!initialized || !fixedDonations) return
     setFixedSnapshots(buildFixedSnapshots(fixedDonations, year, month))
   }, [fixedDonations, year, month, initialized])
+
+  useEffect(() => {
+    if (!members || memberIncomes.length === 0) return
+    setMemberIncomes((prev) =>
+      prev.map((entry) => {
+        const m = members.find((x) => x.id === entry.memberId)
+        if (!m) return entry
+        const authName = m.userId === user?.uid ? user?.displayName : null
+        return {
+          ...entry,
+          memberName: resolveMemberDisplayName(m.displayName, authName),
+        }
+      }),
+    )
+  }, [members, user?.displayName, user?.uid, memberIncomes.length])
 
   const calculations = useMemo(
     () =>
@@ -277,9 +293,9 @@ export function ReportEditor({ year, month, isNew }: ReportEditorProps) {
         <Card className="border-violet-200 bg-violet-50/50">
           <CardContent className="flex flex-wrap items-center justify-between gap-4 py-4">
             <div>
-              <p className="font-medium text-violet-900">{labels.creditFromPreviousMonth}</p>
+              <p className="font-medium text-violet-900">{labels.applyCreditHint}</p>
               <p className="text-sm text-violet-700">
-                {formatShekels(creditFromPreviousMonth)} — {labels.applyCreditHint}
+                זיכוי זמין: {formatShekels(creditFromPreviousMonth)}
               </p>
             </div>
             <label className="flex cursor-pointer items-center gap-2">
@@ -443,7 +459,6 @@ export function ReportEditor({ year, month, isNew }: ReportEditorProps) {
           calculations={calculations}
           openingDebt={openingDebt}
           appliedCredit={appliedCredit}
-          creditAvailable={creditFromPreviousMonth}
           applyCredit={applyCreditFromPrevious}
         />
       </div>

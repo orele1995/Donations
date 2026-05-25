@@ -1,3 +1,4 @@
+import { resolveMemberDisplayName } from '@/lib/member-display'
 import type { HouseholdMember, MemberIncomeEntry, MonthlyReport } from '@/types'
 
 export function buildMemberIncomesFromLegacy(
@@ -10,7 +11,7 @@ export function buildMemberIncomesFromLegacy(
       const found = stored.find((e) => e.memberId === m.id)
       return {
         memberId: m.id,
-        memberName: found?.memberName ?? m.displayName,
+        memberName: found?.memberName ?? resolveMemberDisplayName(m.displayName),
         amount: found?.amount ?? 0,
       }
     })
@@ -21,7 +22,7 @@ export function buildMemberIncomesFromLegacy(
 
   return members.map((m, index) => ({
     memberId: m.id,
-    memberName: m.displayName,
+    memberName: resolveMemberDisplayName(m.displayName),
     amount: index === 0 ? husband : index === 1 ? wife : 0,
   }))
 }

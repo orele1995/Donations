@@ -4,7 +4,6 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -17,26 +16,13 @@ import { LoadingSkeleton } from '@/components/shared/loading-skeleton'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
-  currentMonthKey,
-  formatMonthLabel,
-  getMonthStatus,
-  getPreviousMonth,
-} from '@/utils/dates'
+  buildBalanceChartData,
+  MonthlyBalanceChart,
+} from '@/components/charts/monthly-balance-chart'
+import { currentMonthKey, formatMonthLabel, getPreviousMonth } from '@/utils/dates'
 import { agorotToShekels } from '@/utils/currency'
 import { MONTH_NAMES_HE } from '@/lib/constants'
 import type { MonthlyReport } from '@/types'
-
-const STATUS_COLORS = {
-  positive: '#ef4444',
-  negative: '#10b981',
-  balanced: '#a5b4fc',
-}
-
-const STATUS_LABELS = {
-  positive: labels.statusPositive,
-  negative: labels.statusNegative,
-  balanced: labels.statusBalanced,
-}
 
 function findReport(
   reports: MonthlyReport[],
@@ -65,21 +51,10 @@ export function DashboardPage() {
     [reports, previous.year, previous.month],
   )
 
-  const statusChartData = useMemo(() => {
-    if (!reports) return []
-    return [...reports]
-      .sort((a, b) => a.year - b.year || a.month - b.month)
-      .slice(-12)
-      .map((r) => {
-        const status = getMonthStatus(r.remainingBalance)
-        return {
-          name: MONTH_NAMES_HE[r.month - 1]?.slice(0, 3) ?? String(r.month),
-          status: STATUS_LABELS[status],
-          statusKey: status,
-          value: 1,
-        }
-      })
-  }, [reports])
+  const balanceChartData = useMemo(
+    () => (reports ? buildBalanceChartData(reports) : []),
+    [reports],
+  )
 
   const paidChartData = useMemo(() => {
     if (!reports) return []
@@ -89,6 +64,7 @@ export function DashboardPage() {
       .map((r) => ({
         name: MONTH_NAMES_HE[r.month - 1]?.slice(0, 3) ?? String(r.month),
         paid: agorotToShekels(r.fixedDonationsTotal + r.oneTimeDonationsTotal),
+        fullMonth: formatMonthLabel(r.year, r.month),
       }))
   }, [reports])
 
@@ -135,41 +111,10 @@ export function DashboardPage() {
         <div className="grid gap-6 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">{labels.monthlyStatusChart}</CardTitle>
+              <CardTitle className="text-base">{labels.monthlyBalanceChart}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={statusChartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e8e6f0" />
-                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                    <YAxis hide />
-                    <Tooltip />
-                    <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                      {statusChartData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={STATUS_COLORS[entry.statusKey as keyof typeof STATUS_COLORS]}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-4 text-xs text-[var(--color-muted-foreground)]">
-                <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-red-500" />
-                  {labels.statusPositive}
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                  {labels.statusNegative}
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-indigo-300" />
-                  {labels.statusBalanced}
-                </span>
-              </div>
+              <MonthlyBalanceChart data={balanceChartData} />
             </CardContent>
           </Card>
 
@@ -178,16 +123,35 @@ export function DashboardPage() {
               <CardTitle className="text-base">{labels.monthlyMaaserPaidChart}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-64">
+              <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={paidChartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e8e6f0" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e8e6f0" vertical={false} />
                     <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip
-                      formatter={(v) => `₪${Number(v ?? 0).toLocaleString('he-IL')}`}
+                    <YAxis
+                      tick={{ fontSize: 11 }}
+                      tickFormatter={(v: number) => `₪${v.toLocaleString('he-IL')}`}
                     />
-                    <Bar dataKey="paid" fill="#6366f1" radius={[6, 6, 0, 0]} />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.[0]) return null
+                        const p = payload[0].payload as { fullMonth: string; paid: number }
+                        return (
+                          <div
+                            className="rounded-lg border bg-white px-3 py-2 text-sm shadow-md"
+                            dir="rtl"
+                          >
+                            <p>
+                              {labels.tooltipMonth}: {p.fullMonth}
+                            </p>
+                            <p>
+                              {labels.maaserPaid}: ₪{p.paid.toLocaleString('he-IL')}
+                            </p>
+                          </div>
+                        )
+                      }}
+                    />
+                    <Bar dataKey="paid" fill="#6366f1" radius={[6, 6, 0, 0]} maxBarSize={48} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

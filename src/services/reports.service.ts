@@ -19,6 +19,7 @@ import {
 } from '@/utils/finance'
 import { isFullMonthActive } from '@/utils/dates'
 import { normalizeReport } from '@/utils/report-migration'
+import { resolveMemberDisplayName } from '@/lib/member-display'
 import { createAuditLog } from '@/services/audit.service'
 import * as householdService from '@/services/household.service'
 import type {
@@ -111,7 +112,7 @@ export function buildDefaultMemberIncomes(
     const prev = prevIncomes?.find((e) => e.memberId === m.id)
     return {
       memberId: m.id,
-      memberName: m.displayName,
+      memberName: resolveMemberDisplayName(m.displayName),
       amount: prev?.amount ?? 0,
     }
   })
