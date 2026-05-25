@@ -1,65 +1,54 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
+
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isHouseholdMember(householdId) {
-      return isSignedIn() &&
-        exists(/databases/$(database)/documents/householdMembers/$(request.auth.uid + '_' + householdId)) == false &&
-        existsAfterQuery(householdId);
-    }
-
-    function existsAfterQuery(householdId) {
-      return exists(/databases/$(database)/documents/householdMembers/{memberId}) &&
-        get(/databases/$(database)/documents/householdMembers/{memberId}).data.householdId == householdId &&
-        get(/databases/$(database)/documents/householdMembers/{memberId}).data.userId == request.auth.uid;
-    }
-
-    function memberDoc(householdId) {
-      return get(/databases/$(database)/documents/householdMembers/{memberId})
-        where memberId matches '.*';
-    }
-
     function isMember(householdId) {
-      return isSignedIn();
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/householdMembers/$(request.auth.uid + '_' + householdId));
     }
 
+    // HOUSEHOLDS
     match /households/{householdId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
+      allow read, create, update: if isSignedIn();
     }
 
+    // HOUSEHOLD MEMBERS
     match /householdMembers/{memberId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn();
+      allow read, create, update, delete: if isSignedIn();
     }
 
+    // SETTINGS
     match /householdSettings/{householdId} {
       allow read, write: if isSignedIn();
     }
 
+    // INVITES
     match /householdInvites/{inviteId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
+      allow read, create: if isSignedIn();
     }
 
+    // MONTHLY REPORTS
     match /monthlyReports/{reportId} {
       allow read, write: if isSignedIn();
     }
 
+    // FIXED DONATIONS
     match /fixedDonations/{donationId} {
       allow read, write: if isSignedIn();
     }
 
+    // AUDIT LOGS (read only for safety)
     match /auditLogs/{logId} {
-      allow read, create: if isSignedIn();
-      allow update, delete: if false;
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
     }
 
+    // USER PROFILES
     match /userProfiles/{userId} {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
     }
