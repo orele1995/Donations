@@ -11,7 +11,6 @@ import { NewReportPage } from '@/pages/new-report-page'
 import { ReportEditPage } from '@/pages/report-edit-page'
 import { FixedDonationsPage } from '@/pages/fixed-donations-page'
 import { AuditPage } from '@/pages/audit-page'
-import { SettingsPage } from '@/pages/settings-page'
 import { MembersPage } from '@/pages/members-page'
 import { LoadingSkeleton } from '@/components/shared/loading-skeleton'
 import { isFirebaseConfigured } from '@/lib/firebase'
@@ -53,8 +52,8 @@ function ProtectedRoutes() {
         <Route path="reports/:year/:month" element={<ReportEditPage />} />
         <Route path="fixed-donations" element={<FixedDonationsPage />} />
         <Route path="audit" element={<AuditPage />} />
-        <Route path="settings" element={<SettingsPage />} />
         <Route path="members" element={<MembersPage />} />
+        <Route path="settings" element={<Navigate to="/members" replace />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

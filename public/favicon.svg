@@ -1,4 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="20" fill="#0f766e"/>
-  <text x="50" y="62" font-size="48" text-anchor="middle" fill="white" font-family="Arial">מ</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="64" y1="64" x2="448" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#eef2ff"/>
+      <stop offset="1" stop-color="#f3e8ff"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="128" y1="384" x2="384" y2="128" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6366f1"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- Balance scale -->
+  <line x1="256" y1="120" x2="256" y2="340" stroke="url(#accent)" stroke-width="20" stroke-linecap="round"/>
+  <line x1="156" y1="180" x2="356" y2="180" stroke="url(#accent)" stroke-width="18" stroke-linecap="round"/>
+  <!-- Left pan (debt - subtle red) -->
+  <path d="M156 180 L116 260 Q156 280 196 260 Z" fill="#fecaca" stroke="#ef4444" stroke-width="8" stroke-linejoin="round"/>
+  <!-- Right pan (credit - subtle green) -->
+  <path d="M356 180 L316 260 Q356 280 396 260 Z" fill="#d1fae5" stroke="#10b981" stroke-width="8" stroke-linejoin="round"/>
+  <!-- Chart line -->
+  <polyline points="140,360 200,320 260,340 320,280 380,300" fill="none" stroke="url(#accent)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Shekel symbol -->
+  <text x="256" y="430" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="72" font-weight="700" fill="#6366f1">₪</text>
 </svg>

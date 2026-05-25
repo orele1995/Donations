@@ -2,6 +2,7 @@ import { labels } from '@/lib/hebrew'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { formatShekels } from '@/utils/currency'
+import { getMonthlyFinancialSummary } from '@/utils/monthly-summary'
 import type { ReportCalculations } from '@/types'
 
 interface ReportCalculationsPanelProps {
@@ -17,7 +18,7 @@ export function ReportCalculationsPanel({
   appliedCredit,
   applyCredit,
 }: ReportCalculationsPanelProps) {
-  const finalDue = Math.max(calculations.remainingBalance, 0)
+  const summary = getMonthlyFinancialSummary(calculations.remainingBalance)
 
   type Row = {
     label: string
@@ -25,7 +26,9 @@ export function ReportCalculationsPanel({
     bold?: boolean
     highlight?: boolean
     deduct?: boolean
+    credit?: boolean
     hideZero?: boolean
+    textOnly?: string
   }
 
   const rows: Row[] = [
@@ -43,12 +46,21 @@ export function ReportCalculationsPanel({
       : []),
     { label: labels.fixedDonationsTotal, value: calculations.fixedDonationsTotal },
     { label: labels.oneTimeDonationsTotal, value: calculations.oneTimeDonationsTotal },
-    {
-      label: labels.finalBalance,
-      value: finalDue,
-      bold: true,
-      highlight: finalDue > 0,
+    { label: labels.monthlyFinancialResult, value: summary.displayAmountAgorot, bold: true,
+      textOnly: summary.isBalanced ? summary.statusLabel : undefined,
+      credit: summary.status === 'credit',
+      highlight: summary.status === 'debt',
     },
+    ...(summary.amountDueAgorot > 0
+      ? [
+          {
+            label: labels.amountDue,
+            value: summary.amountDueAgorot,
+            bold: true,
+            highlight: true,
+          },
+        ]
+      : []),
   ].filter((row) => !(row.hideZero && row.value === 0))
 
   return (
@@ -68,15 +80,18 @@ export function ReportCalculationsPanel({
                 className={`shrink-0 tabular-nums ${
                   row.highlight
                     ? 'font-bold text-red-600'
-                    : row.bold
-                      ? 'font-bold text-indigo-700'
-                      : row.deduct
-                        ? 'text-emerald-600'
-                        : ''
+                    : row.credit
+                      ? 'font-bold text-emerald-600'
+                      : row.bold
+                        ? 'font-bold text-indigo-700'
+                        : row.deduct
+                          ? 'text-emerald-600'
+                          : ''
                 }`}
               >
-                {row.deduct ? '−' : ''}
-                {formatShekels(row.value)}
+                {row.textOnly
+                  ? row.textOnly
+                  : `${row.deduct ? '−' : ''}${formatShekels(row.value)}`}
               </span>
             </div>
           </div>

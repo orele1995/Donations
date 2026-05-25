@@ -270,20 +270,28 @@ export function ReportEditor({ year, month, isNew }: ReportEditorProps) {
             <p className="mt-1 text-sm text-amber-600">{labels.unsavedChanges}</p>
           )}
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={() => void handleSave()} disabled={saving}>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            className="h-10"
+            onClick={() => void handleSave()}
+            disabled={saving}
+          >
             <Save className="h-4 w-4" />
             {saving ? labels.loading : labels.save}
           </Button>
           <Button
             variant="outline"
-            size="sm"
+            className="h-10"
             onClick={() => exportReportToExcel(draft)}
           >
             <Download className="h-4 w-4" />
             {labels.exportExcel}
           </Button>
-          <Button variant="outline" onClick={() => navigate('/reports')}>
+          <Button
+            variant="outline"
+            className="h-10"
+            onClick={() => navigate('/reports')}
+          >
             {labels.cancel}
           </Button>
         </div>

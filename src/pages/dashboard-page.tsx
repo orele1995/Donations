@@ -11,8 +11,8 @@ import {
 } from 'recharts'
 import { labels } from '@/lib/hebrew'
 import { useReports } from '@/hooks/use-household-data'
-import { StatCard } from '@/components/shared/stat-card'
 import { LoadingSkeleton } from '@/components/shared/loading-skeleton'
+import { MonthSummaryCard } from '@/components/shared/month-summary-card'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -20,7 +20,8 @@ import {
   MonthlyBalanceChart,
 } from '@/components/charts/monthly-balance-chart'
 import { currentMonthKey, formatMonthLabel, getPreviousMonth } from '@/utils/dates'
-import { agorotToShekels } from '@/utils/currency'
+import { getMonthlyFinancialSummary } from '@/utils/monthly-summary'
+import { agorotToShekels, formatShekels } from '@/utils/currency'
 import { MONTH_NAMES_HE } from '@/lib/constants'
 import type { MonthlyReport } from '@/types'
 
@@ -30,10 +31,6 @@ function findReport(
   month: number,
 ): MonthlyReport | undefined {
   return reports.find((r) => r.year === year && r.month === month)
-}
-
-function netBalance(report: MonthlyReport): number {
-  return Math.max(report.remainingBalance, 0)
 }
 
 export function DashboardPage() {
@@ -49,6 +46,22 @@ export function DashboardPage() {
   const lastReport = useMemo(
     () => (reports ? findReport(reports, previous.year, previous.month) : undefined),
     [reports, previous.year, previous.month],
+  )
+
+  const currentSummary = useMemo(
+    () =>
+      currentReport
+        ? getMonthlyFinancialSummary(currentReport.remainingBalance)
+        : getMonthlyFinancialSummary(0),
+    [currentReport],
+  )
+
+  const lastSummary = useMemo(
+    () =>
+      lastReport
+        ? getMonthlyFinancialSummary(lastReport.remainingBalance)
+        : getMonthlyFinancialSummary(0),
+    [lastReport],
   )
 
   const balanceChartData = useMemo(
@@ -70,6 +83,22 @@ export function DashboardPage() {
 
   if (isLoading) return <LoadingSkeleton rows={4} />
 
+  const currentSubtitle = currentReport
+    ? `${formatMonthLabel(current.year, current.month)}${
+        currentSummary.amountDueAgorot > 0
+          ? ` · ${labels.amountDue}: ${formatShekels(currentSummary.amountDueAgorot)}`
+          : ''
+      }`
+    : labels.noData
+
+  const lastSubtitle = lastReport
+    ? `${formatMonthLabel(previous.year, previous.month)}${
+        lastSummary.amountDueAgorot > 0
+          ? ` · ${labels.amountDue}: ${formatShekels(lastSummary.amountDueAgorot)}`
+          : ''
+      }`
+    : labels.noData
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -85,25 +114,15 @@ export function DashboardPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <StatCard
-          title={labels.currentMonthBalance}
-          value={currentReport ? netBalance(currentReport) : 0}
-          subtitle={
-            currentReport
-              ? formatMonthLabel(current.year, current.month)
-              : labels.noData
-          }
-          variant={currentReport && currentReport.remainingBalance > 0 ? 'due' : 'neutral'}
+        <MonthSummaryCard
+          title={`${labels.monthlyFinancialResult} — ${labels.currentMonth}`}
+          summary={currentSummary}
+          subtitle={currentSubtitle}
         />
-        <StatCard
-          title={labels.lastMonthBalance}
-          value={lastReport ? netBalance(lastReport) : 0}
-          subtitle={
-            lastReport
-              ? formatMonthLabel(previous.year, previous.month)
-              : labels.noData
-          }
-          variant={lastReport && lastReport.remainingBalance > 0 ? 'due' : 'neutral'}
+        <MonthSummaryCard
+          title={`${labels.monthBalanceSummary} — ${labels.previousMonth}`}
+          summary={lastSummary}
+          subtitle={lastSubtitle}
         />
       </div>
 
@@ -111,7 +130,7 @@ export function DashboardPage() {
         <div className="grid gap-6 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">{labels.monthlyBalanceChart}</CardTitle>
+              <CardTitle className="text-base">{labels.monthlyFinancialChart}</CardTitle>
             </CardHeader>
             <CardContent>
               <MonthlyBalanceChart data={balanceChartData} />

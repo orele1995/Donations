@@ -51,7 +51,8 @@ function reportToRows(report: MonthlyReport): (string | number)[][] {
   rows.push(
     [labels.oneTimeDonationsTotal, formatShekels(report.oneTimeDonationsTotal)],
     [],
-    [labels.finalBalance, formatShekels(Math.max(report.remainingBalance, 0))],
+    [labels.monthlyFinancialResult, formatShekels(Math.abs(report.remainingBalance))],
+    [labels.amountDue, formatShekels(Math.max(report.remainingBalance, 0))],
   )
 
   return rows

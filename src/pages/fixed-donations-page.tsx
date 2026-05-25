@@ -210,17 +210,17 @@ export function FixedDonationsPage() {
             <Card key={d.id}>
               <CardHeader className="flex flex-row items-start justify-between gap-2">
                 <CardTitle className="text-base">{d.name}</CardTitle>
-                <div className="flex shrink-0 gap-1">
-                  <Button variant="ghost" size="icon" onClick={() => openEdit(d)}>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => openEdit(d)}>
                     <Pencil className="h-4 w-4" />
+                    {labels.edit}
                   </Button>
                   <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-red-600 hover:text-red-700"
+                    variant="destructive"
+                    size="sm"
                     onClick={() => void handleDelete(d)}
                   >
-                    {labels.delete}
+                    {labels.deleteFixedDonation}
                   </Button>
                 </div>
               </CardHeader>

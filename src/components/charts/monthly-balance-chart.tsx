@@ -13,7 +13,11 @@ import {
 } from 'recharts'
 import { labels } from '@/lib/hebrew'
 import { formatMonthLabel } from '@/utils/dates'
-import { agorotToShekels, formatShekels } from '@/utils/currency'
+import { formatShekels } from '@/utils/currency'
+import {
+  getMonthlyFinancialSummary,
+  mapStatusToMonthStatus,
+} from '@/utils/monthly-summary'
 import type { MonthStatus } from '@/types'
 
 export interface BalanceChartPoint {
@@ -21,7 +25,7 @@ export interface BalanceChartPoint {
   month: number
   name: string
   balance: number
-  balanceAgorot: number
+  summary: ReturnType<typeof getMonthlyFinancialSummary>
   status: MonthStatus
   statusLabel: string
   isBalanced: boolean
@@ -33,11 +37,7 @@ const COLORS = {
   balanced: '#94a3b8',
 } as const
 
-interface TooltipPayload {
-  payload?: BalanceChartPoint
-}
-
-function BalanceTooltip({ active, payload }: { active?: boolean; payload?: TooltipPayload[] }) {
+function BalanceTooltip({ active, payload }: { active?: boolean; payload?: { payload: BalanceChartPoint }[] }) {
   if (!active || !payload?.[0]?.payload) return null
   const point = payload[0].payload
 
@@ -50,11 +50,16 @@ function BalanceTooltip({ active, payload }: { active?: boolean; payload?: Toolt
         {labels.tooltipMonth}: {formatMonthLabel(point.year, point.month)}
       </p>
       <p>
-        {labels.tooltipBalance}: {formatShekels(Math.abs(point.balanceAgorot))}
+        {labels.tooltipMonthlyResult}: {formatShekels(point.summary.displayAmountAgorot)}
       </p>
       <p>
         {labels.tooltipStatus}: {point.statusLabel}
       </p>
+      {point.summary.amountDueAgorot > 0 && (
+        <p>
+          {labels.amountDue}: {formatShekels(point.summary.amountDueAgorot)}
+        </p>
+      )}
     </div>
   )
 }
@@ -66,35 +71,20 @@ export function buildBalanceChartData(
     .sort((a, b) => a.year - b.year || a.month - b.month)
     .slice(-12)
     .map((r) => {
-      const isBalanced = r.remainingBalance === 0
-      const status: MonthStatus = isBalanced
-        ? 'balanced'
-        : r.remainingBalance > 0
-          ? 'positive'
-          : 'negative'
-
-      const statusLabel =
-        status === 'balanced'
-          ? labels.statusBalanced
-          : status === 'positive'
-            ? labels.statusPositive
-            : labels.statusNegative
+      const summary = getMonthlyFinancialSummary(r.remainingBalance)
+      const status = mapStatusToMonthStatus(summary.status)
 
       return {
         year: r.year,
         month: r.month,
         name: formatMonthLabel(r.year, r.month).split(' ')[0] ?? String(r.month),
-        balance: isBalanced ? 0 : -agorotToShekels(r.remainingBalance),
-        balanceAgorot: r.remainingBalance,
+        balance: summary.chartBalanceShekels,
+        summary,
         status,
-        statusLabel,
-        isBalanced,
+        statusLabel: summary.statusLabel,
+        isBalanced: summary.isBalanced,
       }
     })
-}
-
-interface MonthlyBalanceChartProps {
-  data: BalanceChartPoint[]
 }
 
 function BalanceBar(props: RectangleProps & { payload?: BalanceChartPoint }) {
@@ -117,7 +107,7 @@ function BalanceBar(props: RectangleProps & { payload?: BalanceChartPoint }) {
   return <Rectangle {...props} />
 }
 
-export function MonthlyBalanceChart({ data }: MonthlyBalanceChartProps) {
+export function MonthlyBalanceChart({ data }: { data: BalanceChartPoint[] }) {
   const maxAbs = Math.max(...data.map((d) => Math.abs(d.balance)), 1)
 
   return (
@@ -137,7 +127,9 @@ export function MonthlyBalanceChart({ data }: MonthlyBalanceChartProps) {
             dataKey="balance"
             maxBarSize={48}
             radius={[4, 4, 4, 4]}
-            shape={(props) => <BalanceBar {...props} payload={props.payload as BalanceChartPoint} />}
+            shape={(props) => (
+              <BalanceBar {...props} payload={props.payload as BalanceChartPoint} />
+            )}
           >
             {data.map((entry) => (
               <Cell
@@ -157,11 +149,11 @@ export function MonthlyBalanceChart({ data }: MonthlyBalanceChartProps) {
       <div className="mt-3 flex flex-wrap justify-center gap-4 text-xs text-[var(--color-muted-foreground)]">
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-sm bg-red-500" />
-          {labels.statusPositive} ({labels.belowZero})
+          {labels.statusPositive}
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" />
-          {labels.statusNegative} ({labels.aboveZero})
+          {labels.statusNegative}
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-0.5 w-4 bg-slate-400" />
