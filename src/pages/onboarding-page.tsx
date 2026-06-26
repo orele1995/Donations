@@ -15,7 +15,7 @@ import { getHebrewErrorMessage } from '@/utils/errors'
 import { useInvalidateHousehold } from '@/hooks/use-household-data'
 
 export function OnboardingPage() {
-  const { user } = useAuth()
+  const { user, refreshProfile } = useAuth()
   const invalidate = useInvalidateHousehold()
   const [mode, setMode] = useState<'create' | 'join'>('create')
 
@@ -40,8 +40,9 @@ export function OnboardingPage() {
         user.displayName ?? '',
         user.photoURL,
       )
+      await refreshProfile()
       invalidate()
-      toast({ title: labels.saved })
+      toast({ title: labels.createdHousehold })
     } catch (error) {
       toast({ title: getHebrewErrorMessage(error), variant: 'destructive' })
     }
@@ -58,8 +59,9 @@ export function OnboardingPage() {
         user.displayName ?? '',
         user.photoURL,
       )
+      await refreshProfile()
       invalidate()
-      toast({ title: labels.saved })
+      toast({ title: labels.joinedHousehold })
     } catch (error) {
       toast({ title: getHebrewErrorMessage(error), variant: 'destructive' })
     }

@@ -34,6 +34,7 @@ import { toast } from '@/hooks/use-toast'
 import { getHebrewErrorMessage } from '@/utils/errors'
 import { formatMonthLabel } from '@/utils/dates'
 import { formatShekels } from '@/utils/currency'
+import { sortFixedSnapshots, sortOneTimeDonations } from '@/utils/sort'
 import { resolveMemberDisplayName } from '@/lib/member-display'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -47,7 +48,10 @@ export function ReportEditor({ year, month, isNew }: ReportEditorProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { profile, user } = useAuth()
-  const { data: existing } = useReport(year, month, !isNew)
+  const {
+    data: existing,
+    isFetched: reportFetched,
+  } = useReport(year, month, !isNew)
   const { data: members } = useMembers()
   const { data: fixedDonations } = useFixedDonations()
   const invalidate = useInvalidateHousehold()
@@ -65,29 +69,41 @@ export function ReportEditor({ year, month, isNew }: ReportEditorProps) {
   const [fixedSnapshots, setFixedSnapshots] = useState<MonthlyReport['fixedDonationSnapshots']>([])
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [initialized, setInitialized] = useState(false)
+  const [isHydrated, setIsHydrated] = useState(false)
+
+  const dataReady = useMemo(() => {
+    if (!members?.length) return false
+    if (!fixedDonations) return false
+    if (!isNew && !reportFetched) return false
+    return true
+  }, [members, fixedDonations, isNew, reportFetched])
 
   useEffect(() => {
-    if (initialized || !members) return
+    setIsHydrated(false)
+  }, [year, month, isNew])
 
-    const init = async (): Promise<void> => {
+  useEffect(() => {
+    if (!dataReady || !members) return
+
+    const hydrate = async (): Promise<void> => {
       if (existing) {
         setMemberIncomes(
           buildDefaultMemberIncomes(members, existing.memberIncomes),
         )
         setAdditionalIncome(existing.additionalIncome)
-        setOneTimeDonations(existing.oneTimeDonations)
+        setOneTimeDonations(sortOneTimeDonations(existing.oneTimeDonations))
         setOpeningDebt(existing.openingDebt)
         setCreditFromPreviousMonth(existing.creditFromPreviousMonth)
         setApplyCreditFromPrevious(existing.applyCreditFromPrevious)
-        setFixedSnapshots(existing.fixedDonationSnapshots)
-        setInitialized(true)
+        setFixedSnapshots(sortFixedSnapshots(existing.fixedDonationSnapshots))
+        setIsHydrated(true)
         return
       }
 
-      if (isNew && fixedDonations && db && householdId) {
-        const snapshots = buildFixedSnapshots(fixedDonations, year, month)
-        setFixedSnapshots(snapshots)
+      if (isNew && db && householdId) {
+        setFixedSnapshots(
+          sortFixedSnapshots(buildFixedSnapshots(fixedDonations!, year, month)),
+        )
 
         const balances = await getOpeningBalances(db, householdId, year, month)
         setMemberIncomes(buildDefaultMemberIncomes(members, balances.prevMemberIncomes))
@@ -95,11 +111,13 @@ export function ReportEditor({ year, month, isNew }: ReportEditorProps) {
         setCreditFromPreviousMonth(balances.creditFromPreviousMonth)
         setApplyCreditFromPrevious(false)
       }
-      setInitialized(true)
+
+      setIsHydrated(true)
     }
 
-    void init()
+    void hydrate()
   }, [
+    dataReady,
     existing,
     isNew,
     fixedDonations,
@@ -107,13 +125,14 @@ export function ReportEditor({ year, month, isNew }: ReportEditorProps) {
     month,
     householdId,
     members,
-    initialized,
   ])
 
   useEffect(() => {
-    if (!initialized || !fixedDonations) return
-    setFixedSnapshots(buildFixedSnapshots(fixedDonations, year, month))
-  }, [fixedDonations, year, month, initialized])
+    if (!isHydrated || !fixedDonations || !isNew) return
+    setFixedSnapshots(
+      sortFixedSnapshots(buildFixedSnapshots(fixedDonations, year, month)),
+    )
+  }, [fixedDonations, year, month, isHydrated, isNew])
 
   useEffect(() => {
     if (!members || memberIncomes.length === 0) return
@@ -253,7 +272,7 @@ export function ReportEditor({ year, month, isNew }: ReportEditorProps) {
     markDirty()
   }
 
-  if (!initialized || !members) {
+  if (!dataReady || !isHydrated || !members) {
     return <div className="py-12 text-center text-[var(--color-muted-foreground)]">{labels.loading}</div>
   }
 
@@ -306,7 +325,7 @@ export function ReportEditor({ year, month, isNew }: ReportEditorProps) {
                 זיכוי זמין: {formatShekels(creditFromPreviousMonth)}
               </p>
             </div>
-            <label className="flex cursor-pointer items-center gap-2">
+            <label className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-violet-200 bg-white px-3 py-2">
               <input
                 type="checkbox"
                 checked={applyCreditFromPrevious}
@@ -314,7 +333,7 @@ export function ReportEditor({ year, month, isNew }: ReportEditorProps) {
                   setApplyCreditFromPrevious(e.target.checked)
                   markDirty()
                 }}
-                className="h-4 w-4 rounded border-violet-300 text-indigo-600 focus:ring-indigo-400"
+                className="h-5 w-5 shrink-0 rounded border-violet-300 text-indigo-600 focus:ring-indigo-400"
               />
               <span className="text-sm font-medium">{labels.applyCreditFromPrevious}</span>
             </label>

@@ -3,6 +3,7 @@ import {
   useContext,
   useEffect,
   useState,
+  useCallback,
   type ReactNode,
 } from 'react'
 import type { User } from 'firebase/auth'
@@ -21,6 +22,7 @@ interface AuthContextValue {
   isLoading: boolean
   signIn: () => Promise<void>
   signOut: () => Promise<void>
+  refreshProfile: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -63,6 +65,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null)
   }
 
+  const refreshProfile = useCallback(async (): Promise<void> => {
+    if (!user || !db) return
+    const p = await upsertUserProfile(db, user)
+    setProfile(p)
+  }, [user])
+
   return (
     <AuthContext.Provider
       value={{
@@ -71,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         signIn: handleSignIn,
         signOut: handleSignOut,
+        refreshProfile,
       }}
     >
       {children}

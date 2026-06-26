@@ -9,12 +9,11 @@ export function agorotToShekels(agorot: number): number {
 
 export function formatShekels(agorot: number): string {
   const shekels = agorotToShekels(agorot)
-  return new Intl.NumberFormat('he-IL', {
-    style: 'currency',
-    currency: 'ILS',
+  const formatted = new Intl.NumberFormat('he-IL', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(shekels)
+  return `₪ ${formatted}`
 }
 
 export function parseShekelInput(value: string): number {

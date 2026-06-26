@@ -12,7 +12,7 @@ import {
   type RectangleProps,
 } from 'recharts'
 import { labels } from '@/lib/hebrew'
-import { formatMonthLabel } from '@/utils/dates'
+import { formatMonthLabel, formatMonthNumeric } from '@/utils/dates'
 import { formatShekels } from '@/utils/currency'
 import {
   getMonthlyFinancialSummary,
@@ -77,7 +77,7 @@ export function buildBalanceChartData(
       return {
         year: r.year,
         month: r.month,
-        name: formatMonthLabel(r.year, r.month).split(' ')[0] ?? String(r.month),
+        name: formatMonthNumeric(r.year, r.month),
         balance: summary.chartBalanceShekels,
         summary,
         status,
@@ -113,13 +113,21 @@ export function MonthlyBalanceChart({ data }: { data: BalanceChartPoint[] }) {
   return (
     <div className="h-72">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+        <BarChart data={data} margin={{ top: 8, right: 8, left: 48, bottom: 24 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e8e6f0" vertical={false} />
-          <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+          <XAxis
+            dataKey="name"
+            tick={{ fontSize: 11 }}
+            interval={0}
+            angle={-35}
+            textAnchor="end"
+            height={48}
+          />
           <YAxis
             domain={[-maxAbs * 1.15, maxAbs * 1.15]}
             tick={{ fontSize: 11 }}
-            tickFormatter={(v: number) => `₪${Math.abs(v).toLocaleString('he-IL')}`}
+            width={44}
+            tickFormatter={(v: number) => `₪ ${Math.abs(v).toLocaleString('he-IL')}`}
           />
           <ReferenceLine y={0} stroke="#64748b" strokeWidth={2} />
           <Tooltip content={<BalanceTooltip />} />

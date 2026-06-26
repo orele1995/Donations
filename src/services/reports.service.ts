@@ -102,6 +102,7 @@ export function buildFixedSnapshots(
       name: d.name,
       amount: d.amount,
     }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'he'))
 }
 
 export function buildDefaultMemberIncomes(
@@ -278,4 +279,65 @@ export async function getReport(
   const snap = await getDoc(doc(db, COLLECTIONS.monthlyReports, reportId))
   if (!snap.exists()) return null
   return normalizeReport(snap.id, snap.data(), members)
+}
+
+export async function recalculateReport(
+  db: Firestore,
+  report: MonthlyReport,
+  fixedDonations: FixedDonation[],
+  userId: string,
+  userDisplayName: string,
+): Promise<MonthlyReport> {
+  const snapshots = buildFixedSnapshots(fixedDonations, report.year, report.month)
+  const beforeState = report as unknown as Record<string, unknown>
+  const now = new Date().toISOString()
+  const payload = buildReportPayload({
+    householdId: report.householdId,
+    year: report.year,
+    month: report.month,
+    memberIncomes: report.memberIncomes,
+    additionalIncome: report.additionalIncome,
+    oneTimeDonations: report.oneTimeDonations,
+    fixedDonationSnapshots: snapshots,
+    applyCreditFromPrevious: report.applyCreditFromPrevious,
+    creditFromPreviousMonth: report.creditFromPreviousMonth,
+    openingDebt: report.openingDebt,
+    createdAt: report.createdAt,
+    updatedAt: now,
+    createdBy: report.createdBy,
+    updatedBy: userId,
+  })
+
+  await setDoc(doc(db, COLLECTIONS.monthlyReports, report.id), payload, {
+    merge: true,
+  })
+
+  const saved = { ...payload, id: report.id }
+
+  await createAuditLog(db, {
+    householdId: report.householdId,
+    userId,
+    userDisplayName,
+    actionType: 'update',
+    entityType: 'monthlyReport',
+    entityId: report.id,
+    beforeState,
+    afterState: saved as unknown as Record<string, unknown>,
+    year: report.year,
+    month: report.month,
+  })
+
+  return saved
+}
+
+export async function recalculateAffectedReports(
+  db: Firestore,
+  reports: MonthlyReport[],
+  fixedDonations: FixedDonation[],
+  userId: string,
+  userDisplayName: string,
+): Promise<void> {
+  for (const report of reports) {
+    await recalculateReport(db, report, fixedDonations, userId, userDisplayName)
+  }
 }
